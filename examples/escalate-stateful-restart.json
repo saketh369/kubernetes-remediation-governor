@@ -1,0 +1,9 @@
+{
+  "action": "rollout.restart",
+  "namespace": "orders",
+  "resource_kind": "StatefulSet",
+  "resource_name": "orders-db-proxy",
+  "parameters": {},
+  "source": "recommendation-engine",
+  "reason": "Connection pool exhaustion"
+}
