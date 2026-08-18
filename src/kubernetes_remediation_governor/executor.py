@@ -7,19 +7,19 @@ from .models import Decision, ExecutionPlan
 
 @dataclass(frozen=True)
 class ExecutionResult:
-    executed: bool
+    would_execute: bool
     command: tuple[str, ...] | None
     message: str
 
 
 class DryRunExecutor:
-    """Safe-by-default executor.
-
-    It never invokes kubectl. A real adapter should be implemented separately and
-    protected by authentication, authorization, audit logging, and approval controls.
-    """
+    """Safe-by-default executor that never invokes kubectl."""
 
     def execute(self, plan: ExecutionPlan) -> ExecutionResult:
         if plan.decision != Decision.ALLOW or plan.command is None:
             return ExecutionResult(False, None, f"Execution blocked: {plan.decision.value}")
-        return ExecutionResult(True, plan.command, "Dry-run only. No cluster mutation performed.")
+        return ExecutionResult(
+            True,
+            plan.command,
+            "Policy permits this command, but dry-run mode performed no cluster mutation.",
+        )

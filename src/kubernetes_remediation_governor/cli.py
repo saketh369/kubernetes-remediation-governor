@@ -23,6 +23,13 @@ def main() -> None:
 
     request = _load_request(args.request)
     context = ClusterContext(environment=args.environment, max_scale_delta=args.max_scale_delta)
-    plan, result = RemediationGovernor().dry_run(request, context)
+    plan, execution = RemediationGovernor().dry_run(request, context)
 
-    print(json.dumps({"plan": asdict(plan), "execution": asdict(result)}, indent=2, default=str))
+    plan_json = asdict(plan)
+    plan_json["decision"] = plan.decision.value
+    plan_json["risk"] = plan.risk.value
+    print(json.dumps({"plan": plan_json, "execution": asdict(execution)}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

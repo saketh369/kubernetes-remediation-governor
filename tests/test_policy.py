@@ -65,3 +65,17 @@ def test_rollback_requires_evidence_and_approval():
     result = PolicyEngine().evaluate(request, ClusterContext())
     assert result.decision == Decision.ESCALATE
     assert "rollback-evidence-required" in result.matched_rules
+
+
+def test_action_resource_mismatch_is_denied():
+    request = req("deployment.scale", resource_kind="StatefulSet", parameters={"current_replicas": 1, "desired_replicas": 2})
+    result = PolicyEngine().evaluate(request, ClusterContext())
+    assert result.decision == Decision.DENY
+    assert "action-resource-mismatch" in result.matched_rules
+
+
+def test_malformed_resource_name_is_denied():
+    request = req("rollout.restart", resource_name="--context=other-cluster")
+    result = PolicyEngine().evaluate(request, ClusterContext())
+    assert result.decision == Decision.DENY
+    assert "invalid-target-identifier" in result.matched_rules

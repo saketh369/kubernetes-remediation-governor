@@ -109,7 +109,7 @@ Command: kubectl -n payments scale deployment/checkout-api --replicas=5
 Rollback: kubectl -n payments scale deployment/checkout-api --replicas=3
 ```
 
-The included executor is deliberately dry-run only and **does not execute the command against a real cluster**.
+The included executor is deliberately dry-run only and **does not execute the command against a real cluster**. The verifier compares post-action readiness, error rate, and p95 latency against a baseline health snapshot.
 
 ## Repository layout
 
@@ -121,6 +121,7 @@ src/kubernetes_remediation_governor/
   models.py      # typed request/result contracts
   planner.py     # bounded command construction
   policy.py      # deterministic guardrails
+  verifier.py    # independent post-action health verification
 
 tests/           # unit tests for policy, planner, and executor
 examples/        # allow, escalate, and deny scenarios

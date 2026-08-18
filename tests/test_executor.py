@@ -2,7 +2,7 @@ from kubernetes_remediation_governor.executor import DryRunExecutor
 from kubernetes_remediation_governor.models import Decision, ExecutionPlan, Risk
 
 
-def test_dry_run_never_mutates_cluster():
+def test_dry_run_reports_would_execute_without_mutation():
     plan = ExecutionPlan(
         decision=Decision.ALLOW,
         risk=Risk.LOW,
@@ -10,5 +10,5 @@ def test_dry_run_never_mutates_cluster():
         reasons=("test",),
     )
     result = DryRunExecutor().execute(plan)
-    assert result.executed is True
-    assert "Dry-run only" in result.message
+    assert result.would_execute is True
+    assert "no cluster mutation" in result.message

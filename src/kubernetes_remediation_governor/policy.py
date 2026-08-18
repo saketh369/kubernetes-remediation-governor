@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from .models import ClusterContext, Decision, PolicyResult, RemediationRequest, Risk
@@ -15,14 +16,11 @@ class _RuleOutcome:
 
 _DECISION_WEIGHT = {Decision.ALLOW: 0, Decision.ESCALATE: 1, Decision.DENY: 2}
 _RISK_WEIGHT = {Risk.LOW: 0, Risk.MEDIUM: 1, Risk.HIGH: 2, Risk.CRITICAL: 3}
+_K8S_NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$")
 
 
 class PolicyEngine:
-    """Deterministic policy engine.
-
-    Recommendations are treated as untrusted input. The engine only evaluates
-    explicitly supported remediation verbs and never executes arbitrary shell input.
-    """
+    """Deterministic policy engine for untrusted remediation recommendations."""
 
     supported_actions = {
         "rollout.restart",
@@ -31,10 +29,16 @@ class PolicyEngine:
         "deployment.rollback",
     }
 
-    destructive_actions = {"pod.delete", "deployment.rollback"}
+    action_kinds = {
+        "rollout.restart": {"deployment", "statefulset", "daemonset"},
+        "deployment.scale": {"deployment"},
+        "pod.delete": {"pod"},
+        "deployment.rollback": {"deployment"},
+    }
 
     def evaluate(self, request: RemediationRequest, context: ClusterContext) -> PolicyResult:
         outcomes: list[_RuleOutcome] = []
+        kind = request.resource_kind.lower()
 
         if request.action not in self.supported_actions:
             outcomes.append(
@@ -43,6 +47,27 @@ class PolicyEngine:
                     Decision.DENY,
                     Risk.CRITICAL,
                     f"Action '{request.action}' is not in the explicit allowlist.",
+                )
+            )
+        else:
+            allowed_kinds = self.action_kinds[request.action]
+            if kind not in allowed_kinds:
+                outcomes.append(
+                    _RuleOutcome(
+                        "action-resource-mismatch",
+                        Decision.DENY,
+                        Risk.HIGH,
+                        f"Action '{request.action}' is not valid for resource kind '{request.resource_kind}'.",
+                    )
+                )
+
+        if not _is_k8s_name(request.namespace) or not _is_k8s_name(request.resource_name):
+            outcomes.append(
+                _RuleOutcome(
+                    "invalid-target-identifier",
+                    Decision.DENY,
+                    Risk.CRITICAL,
+                    "Namespace and resource name must be valid Kubernetes-style identifiers.",
                 )
             )
 
@@ -56,7 +81,7 @@ class PolicyEngine:
                 )
             )
 
-        if request.resource_kind.lower() in {"clusterrole", "clusterrolebinding", "role", "rolebinding"}:
+        if kind in {"clusterrole", "clusterrolebinding", "role", "rolebinding"}:
             outcomes.append(
                 _RuleOutcome(
                     "rbac-mutation",
@@ -121,7 +146,7 @@ class PolicyEngine:
                 )
 
         if request.action == "rollout.restart":
-            if request.resource_kind.lower() == "statefulset" and not context.allow_stateful_restart:
+            if kind == "statefulset" and not context.allow_stateful_restart:
                 outcomes.append(
                     _RuleOutcome(
                         "stateful-restart",
@@ -188,6 +213,10 @@ class PolicyEngine:
             reasons=tuple(o.reason for o in outcomes),
             matched_rules=tuple(o.name for o in outcomes),
         )
+
+
+def _is_k8s_name(value: str) -> bool:
+    return bool(value) and len(value) <= 253 and bool(_K8S_NAME.fullmatch(value)) and not value.startswith("-")
 
 
 def _as_int(value: object) -> int | None:
