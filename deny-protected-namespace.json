@@ -1,0 +1,9 @@
+{
+  "action": "rollout.restart",
+  "namespace": "kube-system",
+  "resource_kind": "Deployment",
+  "resource_name": "coredns",
+  "parameters": {},
+  "source": "recommendation-engine",
+  "reason": "DNS error spike"
+}
